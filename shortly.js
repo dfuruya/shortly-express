@@ -5,6 +5,8 @@ var bodyParser = require('body-parser');
 
 // var cookieParser = require('cookie-parser');
 var session = require('express-session');
+var bcrypt = require('bcrypt');
+var saltRounds = 10;
 
 var db = require('./app/config');
 var Users = require('./app/collections/users');
@@ -25,7 +27,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(__dirname + '/public'));
 
 
-/*** creating a session object ***/
+/*** creating a session object via the 'express-session' middleware ***/
 app.use(session({
   secret: 'notASecret',
   saveUninitialized: false,
@@ -104,29 +106,37 @@ app.post('/signup', function(req, res) {
   // get username and password from req
   var username = req.body.username;
   var password = req.body.password;
-  // store username and password in database
-  new User({username: username, password: password})
-    .save().then(function() {
-      // redirect to '/'
-      res.redirect('/');
-    });
+  // hash the user's password
+  bcrypt.hash(password, saltRounds, function(err, hashed) {
+    // store username and password in database
+    new User({username: username, password: hashed})
+      .save().then(function() {
+        // redirect to '/'
+        res.redirect('/');
+      });
+  });
 });
 
 app.post('/login', function(req, res) {
   var username = req.body.username;
   var password = req.body.password;
-  // check if user exists in database
-  console.log('**** post /login inside');
-  new User({username: username, password: password})
-    .fetch().then(function(user) {
+    // check if user exists in database
+  new User({username: username})
+    .fetch()
+    .then(function(user) {
       if (user) {
-        // if user exists in db, create or regenerate new session
-        util.createSession(req, res, function() {
-          // then redirect them to homepage
-          res.redirect('/');
+        bcrypt.compare(password, user.get('password'), function(err, match) {
+          if (match) {
+            // if user exists in db, create or regenerate new session
+            util.createSession(req, res, function() {
+              // then redirect them to homepage
+              res.redirect('/');
+            });
+          } else {
+            res.redirect('/login');
+          }
         });
       } else {
-        // if user doesn't exist, take them back to login
         res.redirect('/login');
       }
     })
