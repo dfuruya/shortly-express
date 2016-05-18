@@ -109,8 +109,8 @@ app.post('/signup', function(req, res) {
   // hash the user's password
   bcrypt.hash(password, saltRounds, function(err, hashed) {
     // store username and password in database
-    new User({username: username, password: hashed})
-      .save().then(function() {
+    Users.create({username: username, password: hashed})
+      .then(function() {
         // redirect to '/'
         res.redirect('/');
       });
